@@ -110,7 +110,7 @@ func (s *Service) Time() error {
 	elapsedMilliseconds := time.Since(start).Nanoseconds() / 1000000
 
 	if elapsedMilliseconds > int64(s.Tests.MaxResponseTime) {
-		return fmt.Errorf("Service response time is too damm high. Current %dms, <%d expectedms", elapsedMilliseconds, s.Tests.MaxResponseTime)
+		return fmt.Errorf("Service response time is too damm high. Current %dms, <%dms expected", elapsedMilliseconds, s.Tests.MaxResponseTime)
 	}
 
 	return nil

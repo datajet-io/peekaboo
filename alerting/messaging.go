@@ -39,7 +39,6 @@ func CreateMessaging(m MessagingConfig, s *services.Services) *Messaging {
 
 //SendSMS sends the message to specificed cellnumber
 func (m *Messaging) SendSMS(cellNumber string, message string) error {
-	// my twilio number +4915735983506
 
 	v := url.Values{}
 	v.Set("To", cellNumber)
