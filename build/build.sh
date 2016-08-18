@@ -1,0 +1,5 @@
+#!/bin/bash
+
+cp ../config.json .
+CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo ..
+docker build -t kanary .
