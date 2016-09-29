@@ -24,6 +24,8 @@ func hasInternet() bool {
 		return false
 	}
 
+	defer response.Body.Close()
+
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return false
 	}

@@ -60,9 +60,12 @@ func (s *Service) Ping() error {
 
 	// Make request
 	response, err := http.Get(s.URL)
+
 	if err != nil {
 		return err
 	}
+
+	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
 		return fmt.Errorf("Service HTTP status code is %d, %d expected", response.StatusCode, http.StatusOK)
@@ -102,10 +105,12 @@ func (s *Service) Time() error {
 
 	start := time.Now()
 
-	_, err := http.Get(s.URL)
+	response, err := http.Get(s.URL)
 	if err != nil {
 		return errors.New("Could not reach API")
 	}
+
+	defer response.Body.Close()
 
 	elapsedMilliseconds := time.Since(start).Nanoseconds() / 1000000
 
