@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -9,28 +10,38 @@ import (
 	"github.com/datajet-io/peekaboo/alerting"
 	"github.com/datajet-io/peekaboo/config"
 	"github.com/datajet-io/peekaboo/services"
+	"github.com/cenk/backoff"
 )
 
 const configFilepath = "config.json" // path to config file
 const servicesfilePath = "services.json"
 
+
 //checks if there is Internet connection by pinging Google
 func hasInternet() bool {
+	operation := func() error {
+		// TODO: turn this into a config item
+		response, err := http.Get("https://www.google.com")
 
-	// Make request
-	response, err := http.Get("https://www.google.com")
+		if err != nil {
+			return err
+		}
 
+		defer response.Body.Close()
+
+		if response.StatusCode < 200 || response.StatusCode >= 300 {
+			err := errors.New("Returned status code was not acceptable")
+			return err
+		}
+		return nil // or an error
+	}
+
+	err := backoff.Retry(operation, backoff.NewExponentialBackOff())
 	if err != nil {
-		return false
-	}
-
-	defer response.Body.Close()
-
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return false
-	}
-
-	return true
+	    return false
+	} else {
+	    return true
+    	}
 }
 
 func welcomeOwners(srvs *services.Services, msgs *alerting.Messaging) {

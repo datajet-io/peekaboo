@@ -1,0 +1,4 @@
+package: github.com/datajet-io/peekaboo
+import:
+- package: github.com/cenk/backoff
+  version: ~1.0.0

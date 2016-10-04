@@ -1,0 +1,6 @@
+hash: 025fb87b0b7be6d137a72e16987f990cb64e2d28d2c3514481c992caefb3d2a5
+updated: 2016-10-05T17:01:47.063100509+02:00
+imports:
+- name: github.com/cenk/backoff
+  version: 32cd0c5b3aef12c76ed64aaf678f6c79736be7dc
+testImports: []
