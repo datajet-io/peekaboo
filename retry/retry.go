@@ -7,14 +7,17 @@ import (
 	"github.com/cenk/backoff"
 )
 
+const defaultMaxElapsedTime = 10 * time.Second
+const defaultMaxInterval = 500 * time.Millisecond
+
 func Retrying(operation func() error) error {
 	notify := func(err error, duration time.Duration) {
 		fmt.Printf("Received error during run: %s\n", err)
 	}
 
 	customBackoff := backoff.NewExponentialBackOff()
-	customBackoff.MaxElapsedTime = 10 * time.Second
-	customBackoff.MaxInterval = 500 * time.Millisecond
+	customBackoff.MaxElapsedTime = defaultMaxElapsedTime
+	customBackoff.MaxInterval = defaultMaxInterval
 
 	return backoff.RetryNotify(operation, customBackoff, notify)
 }

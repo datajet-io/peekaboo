@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -69,6 +70,7 @@ func (s *Service) Ping() error {
 		}
 
 		defer response.Body.Close()
+		io.Copy(ioutil.Discard, response.Body)
 
 		if response.StatusCode != http.StatusOK {
 			return fmt.Errorf("Service HTTP status code is %d, %d expected", response.StatusCode, http.StatusOK)
@@ -77,7 +79,6 @@ func (s *Service) Ping() error {
 	}
 
 	return retry.Retrying(operation)
-	// return backoff.Retry(operation, &defaultBackoff)
 }
 
 //JSON test if the service response is valid json
@@ -90,7 +91,6 @@ func (s *Service) JSON() error {
 		}
 
 		defer response.Body.Close()
-
 		data, err := ioutil.ReadAll(response.Body)
 
 		if err != nil {
@@ -107,7 +107,6 @@ func (s *Service) JSON() error {
 	}
 
 	return retry.Retrying(operation)
-	// return backoff.Retry(operation, &defaultBackoff)
 }
 
 //Time tests if the service responds within the specified time limit
@@ -122,6 +121,7 @@ func (s *Service) Time() error {
 		}
 
 		defer response.Body.Close()
+		io.Copy(ioutil.Discard, response.Body)
 
 		elapsedMilliseconds := time.Since(start).Nanoseconds() / 1000000
 
@@ -133,5 +133,4 @@ func (s *Service) Time() error {
 	}
 
 	return retry.Retrying(operation)
-	// return backoff.Retry(operation, &defaultBackoff)
 }
