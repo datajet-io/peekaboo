@@ -1,6 +1,10 @@
-hash: 025fb87b0b7be6d137a72e16987f990cb64e2d28d2c3514481c992caefb3d2a5
-updated: 2016-10-05T17:01:47.063100509+02:00
+hash: 6762cf92531ada3cae00520ec4bf76f9908e8785563e8ee036be97d350285130
+updated: 2016-10-11T14:32:49.4339453+02:00
 imports:
 - name: github.com/cenk/backoff
   version: 32cd0c5b3aef12c76ed64aaf678f6c79736be7dc
+- name: github.com/uber-go/atomic
+  version: 0c9e689d64f004564b79d9a663634756df322902
+- name: github.com/uber-go/zap
+  version: c4939d1166b2220bb45338e21506623b4bbdec50
 testImports: []

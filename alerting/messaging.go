@@ -120,7 +120,7 @@ func (m *Messaging) replyHandler(w http.ResponseWriter, r *http.Request) {
 	switch command {
 	case "start":
 		{
-			srv.Active = true
+			srv.Disabled = false
 			m.SendSMS(sender.Cell, "Alerts for "+srv.Name+" started.")
 			for _, o := range srv.Owners {
 				if o.Cell != sender.Cell {
@@ -130,7 +130,7 @@ func (m *Messaging) replyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	case "stop":
 		{
-			srv.Active = false
+			srv.Disabled = true
 			m.SendSMS(sender.Cell, "Alerts for "+srv.Name+" stopped.")
 			for _, o := range srv.Owners {
 				if o.Cell != sender.Cell {
