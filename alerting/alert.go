@@ -3,24 +3,30 @@ package alerting
 import (
 	"fmt"
 	"time"
+
+	"github.com/uber-go/zap"
 )
 
 //Alert represetns an Alert message
 type Alert struct {
 	CreatedAt time.Time
+	Logger    zap.Logger
 	Message   string
 }
 
 //CreateAlert creates an alert
-func CreateAlert(message string) *Alert {
+func CreateAlert(message string, logger zap.Logger) *Alert {
 	return &Alert{
 		CreatedAt: time.Now(),
+		Logger:    logger,
 		Message:   fmt.Sprintf("%s", message),
 	}
 }
 
 //Log outputs an Alert to stdout with timestamp
 func (a *Alert) Log() {
-	time := fmt.Sprintf("%d/%d/%d %02d:%02d:%02d", a.CreatedAt.Month(), a.CreatedAt.Day(), a.CreatedAt.Year(), a.CreatedAt.Hour(), a.CreatedAt.Minute(), a.CreatedAt.Second())
-	fmt.Printf("%s\t%s\n", time, a.Message)
+	a.Logger.Warn(
+		a.Message,
+		zap.Time("created-at", a.CreatedAt),
+	)
 }

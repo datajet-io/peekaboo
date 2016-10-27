@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"time"
+
+	"github.com/uber-go/zap"
 )
 
 //Services list of services to test
@@ -81,8 +83,6 @@ func (s *Services) Add(service Service) (*Service, error) {
 
 			service.ID = id
 
-			service.Active = true
-
 			s.Services[id] = &service
 
 			return s.Services[id], nil
@@ -94,7 +94,7 @@ func (s *Services) Add(service Service) (*Service, error) {
 }
 
 //LoadFromFile loads the configuration from the given filepath
-func LoadFromFile(filepath string) (*Services, error) {
+func LoadFromFile(filepath string, logger zap.Logger) (*Services, error) {
 
 	data, err := ioutil.ReadFile(filepath)
 
@@ -115,6 +115,7 @@ func LoadFromFile(filepath string) (*Services, error) {
 	// Put services into map with unique keys which are used later for identifying in messaging
 
 	for _, service := range rawServices {
+		service.Logger = logger
 		s.Add(service)
 	}
 

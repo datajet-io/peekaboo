@@ -4,9 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	"github.com/datajet-io/peekaboo/retry"
+	"github.com/uber-go/zap"
 )
 
 //Owner represents the owner of a service who will be contacted in case of test failure
@@ -25,18 +29,18 @@ type Test struct {
 
 //Service represents the API to test
 type Service struct {
-	ID     string  // unique random ID assinged at run-time
-	Name   string  `json:"name"`
-	URL    string  `json:"url"`
-	Tests  Test    `json:"tests"`
-	Owners []Owner `json:"owners"`
-	Active bool
+	ID       string  // unique random ID assinged at run-time
+	Name     string  `json:"name"`
+	URL      string  `json:"url"`
+	Disabled bool    `json:"disabled"`
+	Tests    Test    `json:"tests"`
+	Owners   []Owner `json:"owners"`
+	Logger   zap.Logger
 }
 
 //RunAll performs all tests for the given service
 func (s *Service) RunAll() error {
-
-	if !s.Active {
+	if s.Disabled {
 		return nil
 	}
 
@@ -59,60 +63,90 @@ func (s *Service) RunAll() error {
 func (s *Service) Ping() error {
 
 	// Make request
-	response, err := http.Get(s.URL)
-	if err != nil {
+	operation := func() error {
+		response, err := http.Get(s.URL)
+
+		if err != nil {
+			return err
+		}
+
+		defer response.Body.Close()
+		io.Copy(ioutil.Discard, response.Body)
+
+		if response.StatusCode != http.StatusOK {
+			return fmt.Errorf("Service HTTP status code is %d, %d expected", response.StatusCode, http.StatusOK)
+		}
 		return err
 	}
 
-	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("Service HTTP status code is %d, %d expected", response.StatusCode, http.StatusOK)
-	}
-
-	return nil
-
+	return retry.Retrying(operation, s.Logger)
 }
 
 //JSON test if the service response is valid json
 func (s *Service) JSON() error {
 
-	response, err := http.Get(s.URL)
-	if err != nil {
-		return errors.New("Service not reachable")
+	operation := func() error {
+		response, err := http.Get(s.URL)
+		if err != nil {
+			return errors.New("Service not reachable")
+		}
+
+		defer response.Body.Close()
+		data, err := ioutil.ReadAll(response.Body)
+
+		if err != nil {
+			return err
+		}
+
+		var d interface{}
+
+		if err := json.Unmarshal(data, &d); err != nil {
+			s.Logger.Warn(
+				"Could not unserialize response into JSON",
+				zap.Error(err),
+			)
+			return err
+		}
+
+		return nil
 	}
 
-	defer response.Body.Close()
-
-	data, err := ioutil.ReadAll(response.Body)
-
-	if err != nil {
-		return err
-	}
-
-	var d interface{}
-
-	if err := json.Unmarshal(data, &d); err != nil {
-		return errors.New("Could not unserialize response into JSON")
-	}
-
-	return nil
+	return retry.Retrying(operation, s.Logger)
 }
 
 //Time tests if the service responds within the specified time limit
 func (s *Service) Time() error {
+	operation := func() error {
+		start := time.Now()
 
-	start := time.Now()
+		response, err := http.Get(s.URL)
 
-	_, err := http.Get(s.URL)
-	if err != nil {
-		return errors.New("Could not reach API")
+		if err != nil {
+			s.Logger.Warn(
+				"Encountered error while retrieving URL",
+				zap.String("url", s.URL),
+				zap.Error(err),
+			)
+			return err
+		}
+
+		defer response.Body.Close()
+		io.Copy(ioutil.Discard, response.Body)
+
+		elapsedMilliseconds := time.Since(start).Nanoseconds() / int64(time.Millisecond)
+
+		if elapsedMilliseconds > int64(s.Tests.MaxResponseTime) {
+			s.Logger.Warn(
+				"Response time is too high",
+				zap.String("url", s.URL),
+				zap.Int64("resp_time", elapsedMilliseconds),
+				zap.Int64("resp_limit", int64(s.Tests.MaxResponseTime)),
+			)
+			return fmt.Errorf("Service response time is too damm high. Current %dms, <%dms expected", elapsedMilliseconds, s.Tests.MaxResponseTime)
+		}
+
+		return nil
 	}
 
-	elapsedMilliseconds := time.Since(start).Nanoseconds() / 1000000
-
-	if elapsedMilliseconds > int64(s.Tests.MaxResponseTime) {
-		return fmt.Errorf("Service response time is too damm high. Current %dms, <%dms expected", elapsedMilliseconds, s.Tests.MaxResponseTime)
-	}
-
-	return nil
-
+	return retry.Retrying(operation, s.Logger)
 }
