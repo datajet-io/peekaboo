@@ -52,23 +52,6 @@ func (s *Services) Get(id string) (*Service, error) {
 	return service, nil
 }
 
-// GetOwnerByCell returns the service with the given id
-func (s *Services) GetOwnerByCell(cell string) (*Owner, error) {
-
-	for _, srv := range s.Services {
-
-		for _, owner := range srv.Owners {
-
-			if owner.Cell == cell {
-				return &owner, nil
-			}
-
-		}
-	}
-
-	return nil, errors.New("No owner found with the cell number." + cell)
-}
-
 // Add a given service to the list of services to test
 func (s *Services) Add(service Service) (*Service, error) {
 
