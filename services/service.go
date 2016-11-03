@@ -13,10 +13,10 @@ import (
 	"github.com/uber-go/zap"
 )
 
-//Owner represents the owner of a service who will be contacted in case of test failure
-type Owner struct {
+//Handler contains which notifiers to use for this service if it alerts
+type Alerter struct {
+	Type string `json:"type"`
 	Name string `json:"name"`
-	Cell string `json:"cell"`
 }
 
 //Test contains all the tests parameters for a service
@@ -29,12 +29,12 @@ type Test struct {
 
 //Service represents the API to test
 type Service struct {
-	ID       string  // unique random ID assinged at run-time
-	Name     string  `json:"name"`
-	URL      string  `json:"url"`
-	Disabled bool    `json:"disabled"`
-	Tests    Test    `json:"tests"`
-	Owners   []Owner `json:"owners"`
+	ID       string    // unique random ID assinged at run-time
+	Name     string    `json:"name"`
+	URL      string    `json:"url"`
+	Disabled bool      `json:"disabled"`
+	Tests    Test      `json:"tests"`
+	Alerters []Alerter `json:"alerters"`
 	Logger   zap.Logger
 }
 
