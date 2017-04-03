@@ -9,15 +9,15 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cenk/backoff"
+	"github.com/datajet-io/peekaboo/alerting"
+	"github.com/datajet-io/peekaboo/globals"
 	"github.com/datajet-io/peekaboo/retry"
 	"github.com/uber-go/zap"
 )
 
-//Handler contains which notifiers to use for this service if it alerts
-type Alerter struct {
-	Type string `json:"type"`
-	Name string `json:"name"`
-}
+// InternetCheckURL is the URL to use to check internet connectivity
+const InternetCheckURL string = "https://www.google.com"
 
 //Test contains all the tests parameters for a service
 type Test struct {
@@ -29,13 +29,78 @@ type Test struct {
 
 //Service represents the API to test
 type Service struct {
-	ID       string    // unique random ID assinged at run-time
-	Name     string    `json:"name"`
-	URL      string    `json:"url"`
-	Disabled bool      `json:"disabled"`
-	Tests    Test      `json:"tests"`
-	Alerters []Alerter `json:"alerters"`
-	Logger   zap.Logger
+	Name     string `json:"name"`
+	URL      string `json:"url"`
+	Disabled bool   `json:"disabled"`
+	Failed   bool
+	Tests    Test               `json:"tests"`
+	Handlers []alerting.Alerter `json:"alerters"`
+}
+
+//checks if there is Internet connection by pinging Google
+func hasInternet() bool {
+	notify := func(err error, duration time.Duration) {
+		globals.Logger.Warn(
+			"Encountered error during run",
+			zap.Int64("duration", duration.Nanoseconds()/int64(time.Millisecond)),
+			zap.Error(err),
+		)
+	}
+
+	operation := func() error {
+		response, err := http.Get(InternetCheckURL)
+
+		if err != nil {
+			// Pass this error back, the notify handler will log it for us
+			return err
+		}
+
+		defer response.Body.Close()
+		io.Copy(ioutil.Discard, response.Body)
+
+		if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+			// Pass this error back, the notify handler will log it for us
+			return errors.New("Returned status code was not acceptable")
+		}
+		return err
+	}
+
+	err := backoff.RetryNotify(operation, backoff.NewExponentialBackOff(), notify)
+	return err == nil
+}
+
+//PerformChecks calls RunAll and handles calling the alerters as needed
+func (s *Service) PerformChecks() {
+	if err := s.RunAll(); err != nil {
+		// Sanity check, do we have an Internet connection?
+		if !hasInternet() {
+			alerting.NewAlert("Peekaboo has no Internet connection.")
+			return
+		}
+
+		alert := alerting.NewAlert(fmt.Sprintf("%s: %s.", s.Name, err))
+
+		for _, a := range s.Handlers {
+			a.Trigger(s.Name, alert, make(map[string]interface{}, 0))
+		}
+
+		s.Failed = true
+		return
+	}
+
+	// Failed is initialised to True, since we'd like to resolve any open
+	//  alerts, if any, and if this is the first check of this service.
+	if s.Failed {
+		s.Failed = false
+
+		alert := alerting.NewAlert(fmt.Sprintf("%s: is healthy.", s.Name))
+
+		for _, a := range s.Handlers {
+			a.Resolve(s.Name, alert, make(map[string]interface{}, 0))
+		}
+
+	}
+	return
 }
 
 //RunAll performs all tests for the given service
@@ -44,85 +109,16 @@ func (s *Service) RunAll() error {
 		return nil
 	}
 
-	if err := s.Ping(); err != nil {
-		return err
-	}
+	var elapsedMilliseconds int64
+	var err error
+	var response *http.Response
 
-	if err := s.JSON(); err != nil {
-		return err
-	}
-
-	if err := s.Time(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-//Ping checks if a service is available
-func (s *Service) Ping() error {
-
-	// Make request
-	operation := func() error {
-		response, err := http.Get(s.URL)
-
-		if err != nil {
-			return err
-		}
-
-		defer response.Body.Close()
-		io.Copy(ioutil.Discard, response.Body)
-
-		if response.StatusCode != http.StatusOK {
-			return fmt.Errorf("Service HTTP status code is %d, %d expected", response.StatusCode, http.StatusOK)
-		}
-		return err
-	}
-
-	return retry.Retrying(operation, s.Logger)
-}
-
-//JSON test if the service response is valid json
-func (s *Service) JSON() error {
-
-	operation := func() error {
-		response, err := http.Get(s.URL)
-		if err != nil {
-			return errors.New("Service not reachable")
-		}
-
-		defer response.Body.Close()
-		data, err := ioutil.ReadAll(response.Body)
-
-		if err != nil {
-			return err
-		}
-
-		var d interface{}
-
-		if err := json.Unmarshal(data, &d); err != nil {
-			s.Logger.Warn(
-				"Could not unserialize response into JSON",
-				zap.Error(err),
-			)
-			return err
-		}
-
-		return nil
-	}
-
-	return retry.Retrying(operation, s.Logger)
-}
-
-//Time tests if the service responds within the specified time limit
-func (s *Service) Time() error {
 	operation := func() error {
 		start := time.Now()
-
-		response, err := http.Get(s.URL)
+		response, err = http.Get(s.URL)
 
 		if err != nil {
-			s.Logger.Warn(
+			globals.Logger.Warn(
 				"Encountered error while retrieving URL",
 				zap.String("url", s.URL),
 				zap.Error(err),
@@ -130,23 +126,76 @@ func (s *Service) Time() error {
 			return err
 		}
 
-		defer response.Body.Close()
 		io.Copy(ioutil.Discard, response.Body)
-
-		elapsedMilliseconds := time.Since(start).Nanoseconds() / int64(time.Millisecond)
-
-		if elapsedMilliseconds > int64(s.Tests.MaxResponseTime) {
-			s.Logger.Warn(
-				"Response time is too high",
-				zap.String("url", s.URL),
-				zap.Int64("resp_time", elapsedMilliseconds),
-				zap.Int64("resp_limit", int64(s.Tests.MaxResponseTime)),
-			)
-			return fmt.Errorf("Service response time is too damm high. Current %dms, <%dms expected", elapsedMilliseconds, s.Tests.MaxResponseTime)
-		}
+		elapsedMilliseconds = time.Since(start).Nanoseconds() / int64(time.Millisecond)
 
 		return nil
 	}
 
-	return retry.Retrying(operation, s.Logger)
+	if err = retry.Retrying(operation, globals.Logger); err != nil {
+		return err
+	}
+
+	if err := s.Ping(response); err != nil {
+		return err
+	}
+
+	if s.Tests.ValidateJSON {
+		if err := s.JSON(response); err != nil {
+			return err
+		}
+	}
+
+	if err := s.Time(response, elapsedMilliseconds); err != nil {
+		return err
+	}
+
+	defer response.Body.Close()
+
+	return nil
+}
+
+//Ping checks if a service is available
+func (s *Service) Ping(response *http.Response) error {
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("HTTP status was %d, but expected %d", response.StatusCode, http.StatusOK)
+	}
+
+	return nil
+}
+
+//JSON test if the service response is valid json
+func (s *Service) JSON(response *http.Response) error {
+	data, err := ioutil.ReadAll(response.Body)
+
+	if err != nil {
+		return err
+	}
+
+	var d interface{}
+
+	if err := json.Unmarshal(data, &d); err != nil {
+		globals.Logger.Warn(
+			"Could not unserialize response into JSON",
+			zap.Error(err),
+		)
+		return err
+	}
+
+	return nil
+}
+
+//Time tests if the service responds within the specified time limit
+func (s *Service) Time(response *http.Response, elapsedMilliseconds int64) error {
+	if elapsedMilliseconds > int64(s.Tests.MaxResponseTime) {
+		globals.Logger.Warn(
+			"Response time is too high",
+			zap.String("url", s.URL),
+			zap.Int64("resp_time", elapsedMilliseconds),
+			zap.Int64("resp_limit", int64(s.Tests.MaxResponseTime)),
+		)
+		return fmt.Errorf("Service response time is too damm high. Current %dms, <%dms expected", elapsedMilliseconds, s.Tests.MaxResponseTime)
+	}
+
+	return nil
 }
