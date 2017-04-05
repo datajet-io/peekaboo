@@ -111,6 +111,7 @@ func (s *Service) RunAll() error {
 
 	var elapsedMilliseconds int64
 	var err error
+	var data []byte
 	var response *http.Response
 
 	operation := func() error {
@@ -126,7 +127,7 @@ func (s *Service) RunAll() error {
 			return err
 		}
 
-		io.Copy(ioutil.Discard, response.Body)
+		data, err = ioutil.ReadAll(response.Body)
 		elapsedMilliseconds = time.Since(start).Nanoseconds() / int64(time.Millisecond)
 
 		return nil
@@ -141,7 +142,7 @@ func (s *Service) RunAll() error {
 	}
 
 	if s.Tests.ValidateJSON {
-		if err := s.JSON(response); err != nil {
+		if err := s.JSON(data); err != nil {
 			return err
 		}
 	}
@@ -165,13 +166,7 @@ func (s *Service) Ping(response *http.Response) error {
 }
 
 //JSON test if the service response is valid json
-func (s *Service) JSON(response *http.Response) error {
-	data, err := ioutil.ReadAll(response.Body)
-
-	if err != nil {
-		return err
-	}
-
+func (s *Service) JSON(data []byte) error {
 	var d interface{}
 
 	if err := json.Unmarshal(data, &d); err != nil {
