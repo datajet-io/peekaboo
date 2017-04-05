@@ -7,9 +7,10 @@ import (
 	"github.com/uber-go/zap"
 )
 
-const defaultMaxElapsedTime = 10 * time.Second
+const defaultMaxElapsedTime = 20 * time.Second
 const defaultMaxInterval = 500 * time.Millisecond
 
+// Retrying is a wrapper for cenk/backoff to handle exponential backoffs
 func Retrying(operation func() error, logger zap.Logger) error {
 	notify := func(err error, duration time.Duration) {
 		logger.Warn(

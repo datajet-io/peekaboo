@@ -3,23 +3,23 @@ package alerting
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 
+	"github.com/datajet-io/peekaboo/globals"
 	"github.com/datajet-io/peekaboo/retry"
-	"github.com/datajet-io/peekaboo/services"
 	"github.com/uber-go/zap"
 )
 
 const apiEndpoint = "https://events.pagerduty.com/generic/2010-04-15/create_event.json"
 
-//Pagerduty represents the configuration of the Pageruty account used for notifications
+//PagerdutyClient represents the configuration of the Pageruty account used for notifications
 type PagerdutyClient struct {
 	integrationKey string
 }
 
+// PagerdutyEvent represents an API event object
 type PagerdutyEvent struct {
 	Service_key  string                 `json:"service_key"`
 	Incident_key string                 `json:"incident_key"`
@@ -29,23 +29,35 @@ type PagerdutyEvent struct {
 	Details      map[string]interface{} `json:"details"`
 }
 
+// NewPagerdutyClient is an initilisation helper
 func NewPagerdutyClient(key string) *PagerdutyClient {
 	return &PagerdutyClient{integrationKey: key}
 }
 
-func (p PagerdutyClient) TriggerAlert(service services.Service, alert Alert, details map[string]interface{}) error {
+// Trigger is a helper function to wrap CreateEvent
+func (p *PagerdutyClient) Trigger(serviceName string, alert *Alert, details map[string]interface{}) error {
+	return p.CreateEvent(serviceName, alert, "trigger", details)
+}
+
+// Resolve is a helper function to wrap CreateEvent
+func (p *PagerdutyClient) Resolve(serviceName string, alert *Alert, details map[string]interface{}) error {
+	return p.CreateEvent(serviceName, alert, "resolve", details)
+}
+
+// CreateEvent is a generic func to create pagerduty events
+func (p *PagerdutyClient) CreateEvent(serviceName string, alert *Alert, action string, details map[string]interface{}) error {
 	eventData := &PagerdutyEvent{
 		Service_key:  p.integrationKey,
-		Incident_key: service.Name,
-		Event_type:   "trigger",
+		Incident_key: serviceName,
+		Event_type:   action,
 		Description:  alert.Message,
 		Client:       "peekaboo",
 		Details:      details,
 	}
 
-	eventDataJson, err := json.Marshal(eventData)
+	eventDataJSON, err := json.Marshal(eventData)
 	if err != nil {
-		service.Logger.Warn(
+		globals.Logger.Warn(
 			"Error marshaling 'eventData' to JSON",
 			zap.Object("eventData", eventData),
 			zap.Error(err),
@@ -53,9 +65,9 @@ func (p PagerdutyClient) TriggerAlert(service services.Service, alert Alert, det
 		return err
 	}
 
-	req, err := http.NewRequest("POST", apiEndpoint, bytes.NewBuffer(eventDataJson))
+	req, err := http.NewRequest("POST", apiEndpoint, bytes.NewBuffer(eventDataJSON))
 	if err != nil {
-		service.Logger.Warn(
+		globals.Logger.Warn(
 			"Encountered error creating request",
 			zap.Error(err),
 		)
@@ -68,7 +80,7 @@ func (p PagerdutyClient) TriggerAlert(service services.Service, alert Alert, det
 		client := &http.Client{}
 		resp, err := client.Do(req)
 		if err != nil {
-			service.Logger.Warn(
+			globals.Logger.Warn(
 				"Encountered error calling Pagerduty API",
 				zap.Error(err),
 			)
@@ -78,7 +90,7 @@ func (p PagerdutyClient) TriggerAlert(service services.Service, alert Alert, det
 
 		respBody, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			service.Logger.Warn(
+			globals.Logger.Warn(
 				"Encountered error reading response body",
 				zap.Error(err),
 			)
@@ -92,7 +104,7 @@ func (p PagerdutyClient) TriggerAlert(service services.Service, alert Alert, det
 
 		switch statusCode {
 		case 400:
-			service.Logger.Error(
+			globals.Logger.Error(
 				"Received 400 Invalid Event response",
 				zap.String("resp-body", string(respBody)),
 				zap.Error(err),
@@ -100,13 +112,12 @@ func (p PagerdutyClient) TriggerAlert(service services.Service, alert Alert, det
 			return nil
 		case 403, 429:
 			// This is retryable, so return an error
-			return errors.New(fmt.Sprintf("Received '%s' rate limited response", statusCode))
+			return fmt.Errorf("Received '%d' rate limited response", statusCode)
 		default:
 			// This is might be retryable, unknown territory
-			return errors.New(fmt.Sprintf("Received unexpected response, code was '%s', and body was: '%s'", statusCode, string(respBody)))
+			return fmt.Errorf("Received unexpected response, code was '%d', and body was: '%s'", statusCode, string(respBody))
 		}
-		return err
 	}
 
-	return retry.Retrying(operation, service.Logger)
+	return retry.Retrying(operation, globals.Logger)
 }

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/datajet-io/peekaboo/retry"
-	"github.com/datajet-io/peekaboo/services"
 	"github.com/uber-go/zap"
 )
 
@@ -35,7 +34,7 @@ func NewTwilioClient(replyNumber, accountSID, authToken, urlStr, replyHandlerCal
 	}
 }
 
-func (t TwilioClient) TriggerAlert(service services.Service, alert Alert, details map[string]interface{}) error {
+func (t TwilioClient) TriggerAlert(serviceName string, logger zap.Logger, alert Alert, details map[string]interface{}) error {
 	var err error
 
 	for recipientKey, recipientValue := range t.Recipients {
@@ -53,7 +52,7 @@ func (t TwilioClient) TriggerAlert(service services.Service, alert Alert, detail
 			// Create the request
 			req, err := http.NewRequest("POST", t.URLStr, &rb)
 			if err != nil {
-				service.Logger.Warn(
+				logger.Warn(
 					"Encountered error creating request",
 					zap.Error(err),
 				)
@@ -68,7 +67,7 @@ func (t TwilioClient) TriggerAlert(service services.Service, alert Alert, detail
 			resp, err := client.Do(req)
 
 			if err != nil {
-				service.Logger.Warn(
+				logger.Warn(
 					"Encountered error calling Twilio API",
 					zap.Error(err),
 				)
@@ -76,7 +75,7 @@ func (t TwilioClient) TriggerAlert(service services.Service, alert Alert, detail
 			}
 
 			if resp.StatusCode < 200 && resp.StatusCode > 300 {
-				service.Logger.Warn(
+				logger.Warn(
 					"Received unexpected response code",
 					zap.Int("resp-code", resp.StatusCode),
 					zap.String("recipient-name", recipientKey),
@@ -89,7 +88,7 @@ func (t TwilioClient) TriggerAlert(service services.Service, alert Alert, detail
 			return err
 		}
 
-		err = retry.Retrying(operation, service.Logger)
+		err = retry.Retrying(operation, logger)
 	}
 
 	return err
