@@ -10,6 +10,8 @@ import (
 	"github.com/uber-go/zap"
 )
 
+const twilioRetryTimeoutSeconds = 30
+
 //Twilio represents the configuration of the Twilio account used for in / out messaging
 type TwilioClient struct {
 	ReplyNumber          string            `json:"reply_number"`
@@ -88,7 +90,7 @@ func (t TwilioClient) TriggerAlert(serviceName string, logger zap.Logger, alert 
 			return err
 		}
 
-		err = retry.Retrying(operation, logger)
+		err = retry.Retrying(operation, twilioRetryTimeoutSeconds, logger)
 	}
 
 	return err

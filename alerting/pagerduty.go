@@ -12,7 +12,8 @@ import (
 	"github.com/uber-go/zap"
 )
 
-const apiEndpoint = "https://events.pagerduty.com/generic/2010-04-15/create_event.json"
+const pagerDutyApiEndpoint = "https://events.pagerduty.com/generic/2010-04-15/create_event.json"
+const pagerDutyRetryTimeoutSeconds = 30
 
 //PagerdutyClient represents the configuration of the Pageruty account used for notifications
 type PagerdutyClient struct {
@@ -65,7 +66,7 @@ func (p *PagerdutyClient) CreateEvent(serviceName string, alert *Alert, action s
 		return err
 	}
 
-	req, err := http.NewRequest("POST", apiEndpoint, bytes.NewBuffer(eventDataJSON))
+	req, err := http.NewRequest("POST", pagerDutyApiEndpoint, bytes.NewBuffer(eventDataJSON))
 	if err != nil {
 		globals.Logger.Warn(
 			"Encountered error creating request",
@@ -119,5 +120,5 @@ func (p *PagerdutyClient) CreateEvent(serviceName string, alert *Alert, action s
 		}
 	}
 
-	return retry.Retrying(operation, globals.Logger)
+	return retry.Retrying(operation, pagerDutyRetryTimeoutSeconds, globals.Logger)
 }

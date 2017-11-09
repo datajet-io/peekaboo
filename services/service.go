@@ -21,10 +21,11 @@ const InternetCheckURL string = "https://www.google.com"
 
 //Test contains all the tests parameters for a service
 type Test struct {
-	MaxResponseTime int  `json:"max_response_time"` // milliseconds
-	MinPayloadSize  int  `json:"min_response_size"` // kilobyte
-	ValidateJSON    bool `json:"json"`
-	ValidateCERT    bool `json:"cert"`
+	MaxResponseTime     int `json:"max_response_time"` // milliseconds
+	MinPayloadSize      int `json:"min_response_size"` // kilobyte
+	RetryTimeoutSeconds int
+	ValidateJSON        bool `json:"json"`
+	ValidateCERT        bool `json:"cert"`
 }
 
 //Service represents the API to test
@@ -127,17 +128,17 @@ func (s *Service) RunAll() error {
 			return err
 		}
 
+		if err := s.Ping(response); err != nil {
+			return err
+		}
+
 		data, err = ioutil.ReadAll(response.Body)
 		elapsedMilliseconds = time.Since(start).Nanoseconds() / int64(time.Millisecond)
 
 		return nil
 	}
 
-	if err = retry.Retrying(operation, globals.Logger); err != nil {
-		return err
-	}
-
-	if err := s.Ping(response); err != nil {
+	if err = retry.Retrying(operation, s.Tests.RetryTimeoutSeconds, globals.Logger); err != nil {
 		return err
 	}
 
