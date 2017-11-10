@@ -1,8 +1,10 @@
 package: github.com/datajet-io/peekaboo
 import:
 - package: github.com/cenk/backoff
-  version: ~1.0.0
-- package: github.com/uber-go/zap
+  version: v1.1.0
+- package: go.uber.org/zap
+  version: v1.0.0
 - package: github.com/uber-go/atomic
-  version: ~1.0.0
+  version: v1.2.0
 - package: github.com/spf13/viper
+  version: v1.0.0
