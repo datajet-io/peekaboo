@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/cenk/backoff"
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
 )
 
 const defaultMaxInterval = 500 * time.Millisecond

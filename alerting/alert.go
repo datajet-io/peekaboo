@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/datajet-io/peekaboo/globals"
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
 )
 
 //Alert represents an Alert message

@@ -8,7 +8,7 @@ import (
 	"github.com/datajet-io/peekaboo/globals"
 	"github.com/datajet-io/peekaboo/services"
 	"github.com/spf13/viper"
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
 )
 
 // Config represents the configuration
@@ -41,10 +41,16 @@ func Setup() *Config {
 	if hostnameErr != nil {
 		panic(fmt.Sprintf("Encountered error obtaining hostname: %s", hostnameErr))
 	}
-	globals.Logger = zap.New(
-		zap.NewJSONEncoder(),
+
+	logger, err := zap.NewProduction(
 		zap.Fields(zap.String("host", hostname)),
 	)
+
+	if err != nil {
+		panic("crap")
+	}
+
+	globals.Logger = *logger
 
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")

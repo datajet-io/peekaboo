@@ -13,7 +13,7 @@ import (
 	"github.com/datajet-io/peekaboo/alerting"
 	"github.com/datajet-io/peekaboo/globals"
 	"github.com/datajet-io/peekaboo/retry"
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
 )
 
 // InternetCheckURL is the URL to use to check internet connectivity
@@ -79,7 +79,7 @@ func (s *Service) PerformChecks() {
 		alert := alerting.NewAlert(fmt.Sprintf("%s: %s.", s.Name, err))
 
 		for _, a := range s.Handlers {
-			a.Trigger(s.Name, alert, make(map[string]interface{}, 0))
+			a.Trigger(s.Name, alert)
 		}
 
 		s.Failed = true
@@ -94,7 +94,7 @@ func (s *Service) PerformChecks() {
 		alert := alerting.NewAlert(fmt.Sprintf("%s: is healthy.", s.Name))
 
 		for _, a := range s.Handlers {
-			a.Resolve(s.Name, alert, make(map[string]interface{}, 0))
+			a.Resolve(s.Name, alert)
 		}
 
 	}

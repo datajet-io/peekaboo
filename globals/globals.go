@@ -1,7 +1,7 @@
 package globals
 
 import (
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
 )
 
 var (

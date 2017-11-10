@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/datajet-io/peekaboo/retry"
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
 )
 
 const twilioRetryTimeoutSeconds = 30
@@ -36,7 +36,7 @@ func NewTwilioClient(replyNumber, accountSID, authToken, urlStr, replyHandlerCal
 	}
 }
 
-func (t TwilioClient) TriggerAlert(serviceName string, logger zap.Logger, alert Alert, details map[string]interface{}) error {
+func (t TwilioClient) TriggerAlert(serviceName string, logger zap.Logger, alert Alert) error {
 	var err error
 
 	for recipientKey, recipientValue := range t.Recipients {
