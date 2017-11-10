@@ -19,12 +19,16 @@ build-full:
 .PHONY: docker-build
 docker-build:
 	docker build -t $(DOCKER_IMAGE):$(VERSION) . | tee $(OUTPUTS_PATH)_dockerbuild.log
+	docker tag $(DOCKER_IMAGE):$(VERSION) $(DOCKER_IMAGE):latest | tee -a $(OUTPUTS_PATH)_dockerbuild.log
 
 .PHONY: docker-push
 docker-push:
-	docker login -e $(DOCKER_EMAIL) -u $(DOCKER_USER) -p $(DOCKER_PASS)
-	docker push $(DOCKER_IMAGE):$(VERSION) . | tee $(OUTPUTS_PATH)_dockerpush.log
-	docker push $(DOCKER_IMAGE):latest . | tee -a $(OUTPUTS_PATH)_dockerpush.log
+	docker login -u="$(DOCKER_USER)" -p="$(DOCKER_PASS)"
+	docker push $(DOCKER_IMAGE):$(VERSION) | tee $(OUTPUTS_PATH)_dockerpush.log
+	docker push $(DOCKER_IMAGE):latest | tee -a $(OUTPUTS_PATH)_dockerpush.log
+
+.PHONY: docker-build-push
+docker-build-push: docker-build docker-push
 
 .PHONY: ci
 ci: setup lint build-full docker-build

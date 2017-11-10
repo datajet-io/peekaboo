@@ -11,7 +11,7 @@ go:
 
 script:
   - make ci-setup
-  - make ci
+  - make ci && make docker-build-push
 
 env:
   global:
