@@ -150,17 +150,12 @@ func ParseHandlers(handlers []interface{}, alerters alerting.Alerters) []alertin
 func ParseTests(config Config, tests map[string]interface{}) services.Test {
 	var testsObject services.Test
 	testsObject.RetryTimeoutSeconds = config.Core.RetryTimeoutSeconds
+	testsObject.ValidateJSON = false
 
 	for k, v := range tests {
 		switch k {
-		case "cert":
-			testsObject.ValidateCERT = v.(bool)
 		case "json":
 			testsObject.ValidateJSON = v.(bool)
-		case "max_response_time":
-			testsObject.MaxResponseTime = v.(int)
-		case "min_response_size":
-			testsObject.MinPayloadSize = v.(int)
 		}
 	}
 

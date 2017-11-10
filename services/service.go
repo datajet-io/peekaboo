@@ -21,11 +21,8 @@ const InternetCheckURL string = "https://www.google.com"
 
 //Test contains all the tests parameters for a service
 type Test struct {
-	MaxResponseTime     int `json:"max_response_time"` // milliseconds
-	MinPayloadSize      int `json:"min_response_size"` // kilobyte
 	RetryTimeoutSeconds int
 	ValidateJSON        bool `json:"json"`
-	ValidateCERT        bool `json:"cert"`
 }
 
 //Service represents the API to test
@@ -42,7 +39,7 @@ type Service struct {
 func hasInternet() bool {
 	notify := func(err error, duration time.Duration) {
 		globals.Logger.Warn(
-			"Encountered error during run",
+			"Encountered error checking for internet connection",
 			zap.Int64("duration", duration.Nanoseconds()/int64(time.Millisecond)),
 			zap.Error(err),
 		)
@@ -148,10 +145,6 @@ func (s *Service) RunAll() error {
 		}
 	}
 
-	if err := s.Time(response, elapsedMilliseconds); err != nil {
-		return err
-	}
-
 	defer response.Body.Close()
 
 	return nil
@@ -176,21 +169,6 @@ func (s *Service) JSON(data []byte) error {
 			zap.Error(err),
 		)
 		return err
-	}
-
-	return nil
-}
-
-//Time tests if the service responds within the specified time limit
-func (s *Service) Time(response *http.Response, elapsedMilliseconds int64) error {
-	if elapsedMilliseconds > int64(s.Tests.MaxResponseTime) {
-		globals.Logger.Warn(
-			"Response time is too high",
-			zap.String("url", s.URL),
-			zap.Int64("resp_time", elapsedMilliseconds),
-			zap.Int64("resp_limit", int64(s.Tests.MaxResponseTime)),
-		)
-		return fmt.Errorf("Service response time is too damm high. Current %dms, <%dms expected", elapsedMilliseconds, s.Tests.MaxResponseTime)
 	}
 
 	return nil
