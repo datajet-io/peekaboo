@@ -3,31 +3,31 @@ DOCKER_IMAGE=datajet/peekaboo
 GIT_REV=$(shell git rev-parse --short HEAD)
 GOPACKAGES=$(shell glide nv)
 GO_VERSION=$(or $(GIMME_GO_VERSION),1.7.1)
-IMAGE_VERSION=$(shell echo "${TIMESTAMP}_${GIT_REV}")
 OUTPUTS_BASEDIR=$(or $(CIRCLE_ARTIFACTS),/tmp)
 OUTPUTS_PATH=$(shell echo "${OUTPUTS_BASEDIR}/${BUILD_SUFFIX}")
-TIMESTAMP=$(shell date +%Y%m%d-%H%M%S)
+DATESTAMP=$(shell date +%Y%m%d)
+VERSION=$(shell echo "${DATESTAMP}_${GIT_REV}")
 
 .PHONY: build
 build:
-	go install -v $(GOPACKAGES) 2>&1 | tee $(OUTPUTS_PATH)_goinstall.log
+	go install -v 2>&1 | tee $(OUTPUTS_PATH)_goinstall.log
 
 .PHONY: build-full
-build-full: testsuite
-	go build -v $(GOPACKAGES) 2>&1 | tee $(OUTPUTS_PATH)_gobuild.log
+build-full:
+	go build -v 2>&1 | tee $(OUTPUTS_PATH)_gobuild.log
 
 .PHONY: docker-build
 docker-build:
-	docker build -t $(DOCKER_IMAGE):$(IMAGE_VERSION) . | tee $(OUTPUTS_PATH)_dockerbuild.log
+	docker build -t $(DOCKER_IMAGE):$(VERSION) . | tee $(OUTPUTS_PATH)_dockerbuild.log
 
 .PHONY: docker-push
 docker-push:
 	docker login -e $(DOCKER_EMAIL) -u $(DOCKER_USER) -p $(DOCKER_PASS)
-	docker push $(DOCKER_IMAGE):$(IMAGE_VERSION) . | tee $(OUTPUTS_PATH)_dockerpush.log
+	docker push $(DOCKER_IMAGE):$(VERSION) . | tee $(OUTPUTS_PATH)_dockerpush.log
 	docker push $(DOCKER_IMAGE):latest . | tee -a $(OUTPUTS_PATH)_dockerpush.log
 
 .PHONY: ci
-ci: setup lint build-full build-docker
+ci: setup lint build-full docker-build
 
 .PHONY: ci-setup
 ci-setup:
