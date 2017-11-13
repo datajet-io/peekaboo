@@ -1,4 +1,4 @@
-FROM alpine:3.6
+FROM golang:alpine
 
 ADD peekaboo /peekaboo
 

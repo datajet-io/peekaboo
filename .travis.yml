@@ -7,7 +7,7 @@ go:
 - latest
 script:
 - make ci-setup
-- make ci && make docker-build-push
+- if [[ ${TRAVIS_GO_VERSION} =~ ^1\.9.* ]]; then CGO_ENABLED=0 make ci && make docker-build-push; else CGO_ENABLED=0 make ci; fi
 env:
   global:
   - secure: sHvO+fwVv/VUKDsKxPFoQpGLOqAMppDkgo3oUSkjxIfJ1+bMMk13OiKsPLoDQMCzbB1GK/y2SuMi/6k2Jnfn+SiB2aNIqbKYG1OTbzjmzsA/JQTJxGHxvOf8BYsipwoJco1Sow9Y87HxW6GvytHMK8IO0HYOa22INodl3E/9zm12N6UnSypCe78YwcSQy6G8PA7J49MeUffc+KUelfwoFHBSDqmsTUguVgyZyw3HfdBanA807XhJUaNglurHzCuvnm9gWkvCO4udwNZcKd5Lexmlt01oWHwm3Pl+BKPrv2mlbZTSLXnwHC7XhNBpvhwpeq8RGj++SUZW4vGcSDbO+PctxIPPz/lChVKOtF9h/7LAWe58ymZMx6vEsgzbB+6sGBbRDHbOpq8mdHQuMei/chMzQFmohkwEm4uRXZOIUPRpGa6lTzA4kIpwtOxv3el48IYuLnxvkSsXcOXjW1GDYsTcT4tlC3mvjxWfNI0cfkdjy80EnY8Q4eqYHShoK/l9+i9EuwcyrifcXt7ujv4RLSNxJiwx3ft751XmPwTRt7+KfnHBMaN+bk/Y66H3/+Z01h2oVSk10AEwNuhq1qOwsLavThJDXHz85YWCcoEYQNL+ATaq1VBmE5mMPo4Krx7clBjmDADgj3zm0n9H9Rz5Yyzk1UkhoxNHFByvCDwbSMw=
