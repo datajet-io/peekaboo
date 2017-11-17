@@ -9,10 +9,11 @@ import (
 
 	"github.com/datajet-io/peekaboo/globals"
 	"github.com/datajet-io/peekaboo/retry"
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
 )
 
-const apiEndpoint = "https://events.pagerduty.com/generic/2010-04-15/create_event.json"
+const pagerDutyApiEndpoint = "https://events.pagerduty.com/generic/2010-04-15/create_event.json"
+const pagerDutyRetryTimeoutSeconds = 30
 
 //PagerdutyClient represents the configuration of the Pageruty account used for notifications
 type PagerdutyClient struct {
@@ -35,37 +36,39 @@ func NewPagerdutyClient(key string) *PagerdutyClient {
 }
 
 // Trigger is a helper function to wrap CreateEvent
-func (p *PagerdutyClient) Trigger(serviceName string, alert *Alert, details map[string]interface{}) error {
-	return p.CreateEvent(serviceName, alert, "trigger", details)
+func (p *PagerdutyClient) Trigger(serviceName string, alert *Alert) error {
+	return p.CreateEvent(serviceName, alert, "trigger")
 }
 
 // Resolve is a helper function to wrap CreateEvent
-func (p *PagerdutyClient) Resolve(serviceName string, alert *Alert, details map[string]interface{}) error {
-	return p.CreateEvent(serviceName, alert, "resolve", details)
+func (p *PagerdutyClient) Resolve(serviceName string, alert *Alert) error {
+	return p.CreateEvent(serviceName, alert, "resolve")
 }
 
 // CreateEvent is a generic func to create pagerduty events
-func (p *PagerdutyClient) CreateEvent(serviceName string, alert *Alert, action string, details map[string]interface{}) error {
+func (p *PagerdutyClient) CreateEvent(serviceName string, alert *Alert, action string) error {
 	eventData := &PagerdutyEvent{
 		Service_key:  p.integrationKey,
 		Incident_key: serviceName,
 		Event_type:   action,
 		Description:  alert.Message,
 		Client:       "peekaboo",
-		Details:      details,
 	}
 
 	eventDataJSON, err := json.Marshal(eventData)
 	if err != nil {
 		globals.Logger.Warn(
 			"Error marshaling 'eventData' to JSON",
-			zap.Object("eventData", eventData),
+			zap.String("incident_key", eventData.Incident_key),
+			zap.String("event_type", eventData.Event_type),
+			zap.String("description", eventData.Description),
+			zap.String("client", "peekaboo"),
 			zap.Error(err),
 		)
 		return err
 	}
 
-	req, err := http.NewRequest("POST", apiEndpoint, bytes.NewBuffer(eventDataJSON))
+	req, err := http.NewRequest("POST", pagerDutyApiEndpoint, bytes.NewBuffer(eventDataJSON))
 	if err != nil {
 		globals.Logger.Warn(
 			"Encountered error creating request",
@@ -119,5 +122,5 @@ func (p *PagerdutyClient) CreateEvent(serviceName string, alert *Alert, action s
 		}
 	}
 
-	return retry.Retrying(operation, globals.Logger)
+	return retry.Retrying(operation, pagerDutyRetryTimeoutSeconds, globals.Logger)
 }

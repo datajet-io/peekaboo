@@ -7,8 +7,10 @@ import (
 	"strings"
 
 	"github.com/datajet-io/peekaboo/retry"
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
 )
+
+const twilioRetryTimeoutSeconds = 30
 
 //Twilio represents the configuration of the Twilio account used for in / out messaging
 type TwilioClient struct {
@@ -34,7 +36,7 @@ func NewTwilioClient(replyNumber, accountSID, authToken, urlStr, replyHandlerCal
 	}
 }
 
-func (t TwilioClient) TriggerAlert(serviceName string, logger zap.Logger, alert Alert, details map[string]interface{}) error {
+func (t TwilioClient) TriggerAlert(serviceName string, logger zap.Logger, alert Alert) error {
 	var err error
 
 	for recipientKey, recipientValue := range t.Recipients {
@@ -88,7 +90,7 @@ func (t TwilioClient) TriggerAlert(serviceName string, logger zap.Logger, alert 
 			return err
 		}
 
-		err = retry.Retrying(operation, logger)
+		err = retry.Retrying(operation, twilioRetryTimeoutSeconds, logger)
 	}
 
 	return err

@@ -8,7 +8,7 @@ import (
 	"github.com/datajet-io/peekaboo/globals"
 	"github.com/datajet-io/peekaboo/services"
 	"github.com/spf13/viper"
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
 )
 
 // Config represents the configuration
@@ -20,15 +20,18 @@ type Config struct {
 
 // Core is the type for our core configuration section
 type Core struct {
-	TestInterval int
+	RetryTimeoutSeconds int
+	TestIntervalSeconds int
 }
 
 func NewCore() *Core {
 	// Set defaults
-	defaultTestInterval := 60
+	defaultRetryTimeoutSeconds := 30
+	defaultTestIntervalSeconds := 60
 
 	return &Core{
-		TestInterval: defaultTestInterval,
+		RetryTimeoutSeconds: defaultRetryTimeoutSeconds,
+		TestIntervalSeconds: defaultTestIntervalSeconds,
 	}
 }
 
@@ -38,10 +41,16 @@ func Setup() *Config {
 	if hostnameErr != nil {
 		panic(fmt.Sprintf("Encountered error obtaining hostname: %s", hostnameErr))
 	}
-	globals.Logger = zap.New(
-		zap.NewJSONEncoder(),
+
+	logger, err := zap.NewProduction(
 		zap.Fields(zap.String("host", hostname)),
 	)
+
+	if err != nil {
+		panic("crap")
+	}
+
+	globals.Logger = *logger
 
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
@@ -60,18 +69,18 @@ func Setup() *Config {
 	tempConfig := viper.AllSettings()
 
 	var config Config
-	config.Alerters = SetupAlerters(tempConfig)
 	config.Core = SetupCore(tempConfig)
-	config.Services = SetupServices(tempConfig, config.Alerters)
+	config.Alerters = SetupAlerters(config, tempConfig)
+	config.Services = SetupServices(config, tempConfig, config.Alerters)
 
 	return &config
 }
 
 // SetupAlerters is responsible for parsing the alerters config section
-func SetupAlerters(config map[string]interface{}) alerting.Alerters {
+func SetupAlerters(config Config, rawConfig map[string]interface{}) alerting.Alerters {
 	alerters := make(alerting.Alerters, 0)
 
-	for k, v := range config["alerters"].(map[string]interface{}) {
+	for k, v := range rawConfig["alerters"].(map[string]interface{}) {
 		alerters[k] = alerting.NewAlerterClient(k, v.(map[string]interface{}))
 	}
 
@@ -84,9 +93,13 @@ func SetupCore(config map[string]interface{}) *Core {
 
 	for k, v := range config["core"].(map[string]interface{}) {
 		switch k {
-		case "test_interval":
+		case "test_interval_seconds":
 			if v, ok := v.(int); ok && v >= 1 {
-				core.TestInterval = v
+				core.TestIntervalSeconds = v
+			}
+		case "retry_timeout_seconds":
+			if v, ok := v.(int); ok && v >= 1 {
+				core.RetryTimeoutSeconds = v
 			}
 		}
 	}
@@ -95,10 +108,10 @@ func SetupCore(config map[string]interface{}) *Core {
 }
 
 // SetupServices is responsible for parsing the services config section
-func SetupServices(config map[string]interface{}, alerters alerting.Alerters) services.Services {
+func SetupServices(config Config, rawConfig map[string]interface{}, alerters alerting.Alerters) services.Services {
 	servicesObjects := make(map[string]*services.Service, 0)
 
-	for k, v := range config["services"].(map[string]interface{}) {
+	for k, v := range rawConfig["services"].(map[string]interface{}) {
 		var service services.Service
 		service.Name = k
 		service.Failed = true
@@ -110,7 +123,7 @@ func SetupServices(config map[string]interface{}, alerters alerting.Alerters) se
 			case "handlers":
 				service.Handlers = ParseHandlers(attributeValue.([]interface{}), alerters)
 			case "tests":
-				service.Tests = ParseTests(attributeValue.(map[string]interface{}))
+				service.Tests = ParseTests(config, attributeValue.(map[string]interface{}))
 			case "url":
 				service.URL = attributeValue.(string)
 			}
@@ -140,19 +153,15 @@ func ParseHandlers(handlers []interface{}, alerters alerting.Alerters) []alertin
 }
 
 // ParseTests is a helper function used by Setup
-func ParseTests(tests map[string]interface{}) services.Test {
+func ParseTests(config Config, tests map[string]interface{}) services.Test {
 	var testsObject services.Test
+	testsObject.RetryTimeoutSeconds = config.Core.RetryTimeoutSeconds
+	testsObject.ValidateJSON = false
 
 	for k, v := range tests {
 		switch k {
-		case "cert":
-			testsObject.ValidateCERT = v.(bool)
 		case "json":
 			testsObject.ValidateJSON = v.(bool)
-		case "max_response_time":
-			testsObject.MaxResponseTime = v.(int)
-		case "min_response_size":
-			testsObject.MinPayloadSize = v.(int)
 		}
 	}
 

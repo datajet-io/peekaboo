@@ -4,14 +4,13 @@ import (
 	"time"
 
 	"github.com/cenk/backoff"
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
 )
 
-const defaultMaxElapsedTime = 20 * time.Second
 const defaultMaxInterval = 500 * time.Millisecond
 
 // Retrying is a wrapper for cenk/backoff to handle exponential backoffs
-func Retrying(operation func() error, logger zap.Logger) error {
+func Retrying(operation func() error, retryTimeoutSeconds int, logger zap.Logger) error {
 	notify := func(err error, duration time.Duration) {
 		logger.Warn(
 			"Encountered error during run",
@@ -21,7 +20,7 @@ func Retrying(operation func() error, logger zap.Logger) error {
 	}
 
 	customBackoff := backoff.NewExponentialBackOff()
-	customBackoff.MaxElapsedTime = defaultMaxElapsedTime
+	customBackoff.MaxElapsedTime = time.Duration(retryTimeoutSeconds) * time.Second
 	customBackoff.MaxInterval = defaultMaxInterval
 
 	return backoff.RetryNotify(operation, customBackoff, notify)

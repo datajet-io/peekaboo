@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+set -ue
+
+mkdir -p ${HOME}/bin
+curl -sL https://github.com/Masterminds/glide/releases/download/v0.12.3/glide-v0.12.3-linux-amd64.tar.gz | tar --strip-components 1 -C ${HOME}/bin -xzf -
+go get -u github.com/alecthomas/gometalinter
+gometalinter --install
+go get github.com/axw/gocov/gocov
+go get -u gopkg.in/matm/v1/gocov-html

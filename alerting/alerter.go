@@ -15,8 +15,8 @@ func NewAlerterClient(name string, config map[string]interface{}) Alerter {
 
 // Alerter generic interface type
 type Alerter interface {
-	Trigger(serviceName string, alert *Alert, details map[string]interface{}) error
-	Resolve(serviceName string, alert *Alert, details map[string]interface{}) error
+	Trigger(serviceName string, alert *Alert) error
+	Resolve(serviceName string, alert *Alert) error
 }
 
 //Alerters map of alerter handlers to use

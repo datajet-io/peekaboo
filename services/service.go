@@ -13,7 +13,7 @@ import (
 	"github.com/datajet-io/peekaboo/alerting"
 	"github.com/datajet-io/peekaboo/globals"
 	"github.com/datajet-io/peekaboo/retry"
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
 )
 
 // InternetCheckURL is the URL to use to check internet connectivity
@@ -21,10 +21,8 @@ const InternetCheckURL string = "https://www.google.com"
 
 //Test contains all the tests parameters for a service
 type Test struct {
-	MaxResponseTime int  `json:"max_response_time"` // milliseconds
-	MinPayloadSize  int  `json:"min_response_size"` // kilobyte
-	ValidateJSON    bool `json:"json"`
-	ValidateCERT    bool `json:"cert"`
+	RetryTimeoutSeconds int
+	ValidateJSON        bool `json:"json"`
 }
 
 //Service represents the API to test
@@ -41,7 +39,7 @@ type Service struct {
 func hasInternet() bool {
 	notify := func(err error, duration time.Duration) {
 		globals.Logger.Warn(
-			"Encountered error during run",
+			"Encountered error checking for internet connection",
 			zap.Int64("duration", duration.Nanoseconds()/int64(time.Millisecond)),
 			zap.Error(err),
 		)
@@ -81,7 +79,7 @@ func (s *Service) PerformChecks() {
 		alert := alerting.NewAlert(fmt.Sprintf("%s: %s.", s.Name, err))
 
 		for _, a := range s.Handlers {
-			a.Trigger(s.Name, alert, make(map[string]interface{}, 0))
+			a.Trigger(s.Name, alert)
 		}
 
 		s.Failed = true
@@ -96,7 +94,7 @@ func (s *Service) PerformChecks() {
 		alert := alerting.NewAlert(fmt.Sprintf("%s: is healthy.", s.Name))
 
 		for _, a := range s.Handlers {
-			a.Resolve(s.Name, alert, make(map[string]interface{}, 0))
+			a.Resolve(s.Name, alert)
 		}
 
 	}
@@ -127,17 +125,17 @@ func (s *Service) RunAll() error {
 			return err
 		}
 
+		if err := s.Ping(response); err != nil {
+			return err
+		}
+
 		data, err = ioutil.ReadAll(response.Body)
 		elapsedMilliseconds = time.Since(start).Nanoseconds() / int64(time.Millisecond)
 
 		return nil
 	}
 
-	if err = retry.Retrying(operation, globals.Logger); err != nil {
-		return err
-	}
-
-	if err := s.Ping(response); err != nil {
+	if err = retry.Retrying(operation, s.Tests.RetryTimeoutSeconds, globals.Logger); err != nil {
 		return err
 	}
 
@@ -145,10 +143,6 @@ func (s *Service) RunAll() error {
 		if err := s.JSON(data); err != nil {
 			return err
 		}
-	}
-
-	if err := s.Time(response, elapsedMilliseconds); err != nil {
-		return err
 	}
 
 	defer response.Body.Close()
@@ -175,21 +169,6 @@ func (s *Service) JSON(data []byte) error {
 			zap.Error(err),
 		)
 		return err
-	}
-
-	return nil
-}
-
-//Time tests if the service responds within the specified time limit
-func (s *Service) Time(response *http.Response, elapsedMilliseconds int64) error {
-	if elapsedMilliseconds > int64(s.Tests.MaxResponseTime) {
-		globals.Logger.Warn(
-			"Response time is too high",
-			zap.String("url", s.URL),
-			zap.Int64("resp_time", elapsedMilliseconds),
-			zap.Int64("resp_limit", int64(s.Tests.MaxResponseTime)),
-		)
-		return fmt.Errorf("Service response time is too damm high. Current %dms, <%dms expected", elapsedMilliseconds, s.Tests.MaxResponseTime)
 	}
 
 	return nil
